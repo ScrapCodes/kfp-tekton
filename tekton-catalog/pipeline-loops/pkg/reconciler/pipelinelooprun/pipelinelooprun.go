@@ -100,9 +100,10 @@ func (c *Reconciler) ReconcileKind(ctx context.Context, run *v1alpha1.Run) pkgre
 		return nil
 	}
 
+	//TODO: First check run.Spec.Spec.TypeMeta exist or not to avoid segmentation fault
 	if run.Spec.Spec != nil &&
-		(run.Spec.Spec.APIVersion != pipelineloopv1alpha1.SchemeGroupVersion.String() ||
-			run.Spec.Spec.Kind != pipelineloop.PipelineLoopControllerName) {
+		(run.Spec.Spec.TypeMeta.APIVersion != pipelineloopv1alpha1.SchemeGroupVersion.String() ||
+			run.Spec.Spec.TypeMeta.Kind != pipelineloop.PipelineLoopControllerName) {
 		logger.Errorf("Received control for a Run %s/%s that does not reference a PipelineLoop custom CRD spec", run.Namespace, run.Name)
 		return nil
 	}
@@ -328,22 +329,8 @@ func (c *Reconciler) getPipelineLoop(ctx context.Context, run *v1alpha1.Run) (*m
 			return nil, nil, fmt.Errorf("Error unmarshal PipelineLoop spec for Run %s: %w", fmt.Sprintf("%s/%s", run.Namespace, run.Name), err)
 		}
 		fmt.Errorf("PipelineLoopSpec unmarshalled as: %v", pipelineLoopSpec)
-		pipelineloopObject := &pipelineloopv1alpha1.PipelineLoop{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       run.Spec.Spec.Kind,
-				APIVersion: run.Spec.Spec.APIVersion,
-			},
-			Spec: pipelineLoopSpec,
-		}
-		tl, err2 := c.pipelineloopClientSet.CustomV1alpha1().PipelineLoops(run.Namespace).Create(ctx, pipelineloopObject, metav1.CreateOptions{})
-		if err2 != nil {
-			run.Status.MarkRunFailed(pipelineloopv1alpha1.PipelineLoopRunReasonCouldntGetPipelineLoop.String(),
-				"Error creating PipelineLoop for Run %s/%s: %s",
-				run.Namespace, run.Name, err2)
-			return nil, nil, fmt.Errorf("Error creating PipelineLoop for Run %s: %w", fmt.Sprintf("%s/%s", run.Namespace, run.Name), err2)
-		}
-		pipelineLoopMeta = tl.ObjectMeta
-		pipelineLoopSpec = tl.Spec
+		// TODO: Verify pipelineLoopSpec is a valid spec.
+		pipelineLoopMeta = metav1.ObjectMeta{Name: run.Name}
 		fmt.Errorf("PipelineLoopSpec after creation: %v", pipelineLoopSpec)
 	} else {
 		// Run does not require name but for PipelineLoop it does.
