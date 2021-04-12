@@ -87,15 +87,26 @@ func (c *Reconciler) ReconcileKind(ctx context.Context, run *v1alpha1.Run) pkgre
 		logger.Errorf("Run %s/%s can either refer an existing PipelineLoop custom CRD or provide it's spec and not both.", run.Namespace, run.Name)
 		return nil
 	}
+	if run.Spec.Spec == nil {
+		logger.Errorf("Run %s/%s does not provide a spec.", run.Namespace, run.Name)
+		return nil
+	}
 	// Check that the Run references a PipelineLoop CRD.  The logic is controller.go should ensure that only this type of Run
 	// is reconciled this controller but it never hurts to do some bullet-proofing.
-	if !isBothRefOrSpec ||
-		run.Spec.Ref.APIVersion != pipelineloopv1alpha1.SchemeGroupVersion.String() ||
-		run.Spec.Ref.Kind != pipelineloop.PipelineLoopControllerName {
-		logger.Errorf("Received control for a Run %s/%s that does not reference a PipelineLoop custom CRD", run.Namespace, run.Name)
+	if run.Spec.Ref != nil &&
+		(run.Spec.Ref.APIVersion != pipelineloopv1alpha1.SchemeGroupVersion.String() ||
+			run.Spec.Ref.Kind != pipelineloop.PipelineLoopControllerName) {
+		logger.Errorf("Received control for a Run %s/%s that does not reference a PipelineLoop custom CRD ref", run.Namespace, run.Name)
 		return nil
 	}
 
+	if run.Spec.Spec != nil &&
+		(run.Spec.Spec.APIVersion != pipelineloopv1alpha1.SchemeGroupVersion.String() ||
+			run.Spec.Spec.Kind != pipelineloop.PipelineLoopControllerName) {
+		logger.Errorf("Received control for a Run %s/%s that does not reference a PipelineLoop custom CRD spec", run.Namespace, run.Name)
+		return nil
+	}
+	logger.Infof("Received control for a Run %s/%s %-v", run.Namespace, run.Name, run.Spec.Spec)
 	// If the Run has not started, initialize the Condition and set the start time.
 	if !run.HasStarted() {
 		logger.Infof("Starting new Run %s/%s", run.Namespace, run.Name)
