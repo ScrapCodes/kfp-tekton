@@ -797,6 +797,8 @@ class TektonCompiler(Compiler):
             # custom task controller is handling the container/task execution.
             self.artifact_items.pop(template['metadata']['name'], None)
             self.output_artifacts.pop(template['metadata']['name'], None)
+            # In case of custom task timeout is not yet supported.
+            task_ref.pop('timeout', '')
             break
         if task_ref.get('taskSpec', ''):
           task_ref['taskSpec']['metadata'] = task_ref['taskSpec'].get('metadata', {})
