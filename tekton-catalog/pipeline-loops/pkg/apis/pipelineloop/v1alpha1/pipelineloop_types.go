@@ -98,6 +98,8 @@ const (
 	// PipelineLoopRunReasonCouldntCancel indicates that a Run was cancelled but attempting to update
 	// the running TaskRun as cancelled failed.
 	PipelineLoopRunReasonCouldntCancel PipelineLoopRunReason = "PipelineLoopRunCouldntCancel"
+	// the running TaskRun as cancelled failed.
+	PipelineLoopRunReasonCouldntRetry PipelineLoopRunReason = "PipelineLoopRunCouldntRetry"
 
 	// PipelineLoopRunReasonCouldntGetPipelineLoop indicates that the associated PipelineLoop couldn't be retrieved
 	PipelineLoopRunReasonCouldntGetPipelineLoop PipelineLoopRunReason = "CouldntGetPipelineLoop"

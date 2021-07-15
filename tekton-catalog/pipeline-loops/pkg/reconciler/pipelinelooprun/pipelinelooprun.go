@@ -131,7 +131,12 @@ func (c *Reconciler) ReconcileKind(ctx context.Context, run *v1alpha1.Run) pkgre
 		afterCondition := run.Status.GetCondition(apis.ConditionSucceeded)
 		events.Emit(ctx, nil, afterCondition, run)
 	}
-
+	if run.IsRetry() {
+		logger.Infof("Retrying PipelineLoop for Run: %s, conditions reset.", run.Name)
+		run.Status.InitializeConditions()
+		afterCondition := run.Status.GetCondition(apis.ConditionSucceeded)
+		events.Emit(ctx, nil, afterCondition, run)
+	}
 	if run.IsDone() {
 		logger.Infof("Run %s/%s is done", run.Namespace, run.Name)
 		return nil
@@ -225,7 +230,7 @@ func (c *Reconciler) reconcile(ctx context.Context, run *v1alpha1.Run, status *p
 	if err != nil {
 		return fmt.Errorf("error updating PipelineRun status for Run %s/%s: %w", run.Namespace, run.Name, err)
 	}
-
+	logger.Infof("Whether run is a retry:%v", run.IsRetry())
 	// Run is cancelled, just cancel all the running instance and return
 	if run.IsCancelled() {
 		if len(failedPrs) > 0 {
@@ -247,7 +252,23 @@ func (c *Reconciler) reconcile(ctx context.Context, run *v1alpha1.Run, status *p
 		}
 		return nil
 	}
-
+	if run.IsRetry() {
+		logger.Infof("Retrying PipelineLoop for Run: %s, patching.", run.Name)
+		patch, err := getRetryClearPatch()
+		if err != nil {
+			run.Status.MarkRunRunning(pipelineloopv1alpha1.PipelineLoopRunReasonCouldntRetry.String(),
+				"Failed to patch Run `%s` with clear retry: %v", run.Name, err)
+			return nil
+		}
+		if _, err := c.pipelineClientSet.TektonV1alpha1().Runs(run.Namespace).Patch(ctx, run.Name, types.JSONPatchType, patch, metav1.PatchOptions{}); err != nil {
+			run.Status.MarkRunRunning(pipelineloopv1alpha1.PipelineLoopRunReasonCouldntRetry.String(),
+				"Failed to patch Run `%s` with clear retry: %v", run.Name, err)
+			return nil
+		}
+		run.Spec.Status = ""
+		highestIteration = 0
+		failedPrs = []*v1beta1.PipelineRun{}
+	}
 	// Run may be marked succeeded already by updatePipelineRunStatus
 	if run.IsSuccessful() {
 		return nil
@@ -501,6 +522,22 @@ func (c *Reconciler) updatePipelineRunStatus(logger *zap.SugaredLogger, run *v1a
 		}
 	}
 	return highestIteration, currentRunningPrs, failedPrs, nil
+}
+
+func getRetryClearPatch() ([]byte, error) {
+	patches := []jsonpatch.JsonPatchOperation{{
+		Operation: "test",
+		Path:      "/spec/status",
+		Value:     v1alpha1.RunSpecStatusRetry,
+	}, {
+		Operation: "remove",
+		Path:      "/spec/status",
+	}}
+	patchBytes, err := json.Marshal(patches)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal patch bytes in order to clear retry: %v", err)
+	}
+	return patchBytes, nil
 }
 
 func getCancelPatch() ([]byte, error) {

@@ -18,4 +18,5 @@ require (
 replace (
 	contrib.go.opencensus.io/exporter/stackdriver => contrib.go.opencensus.io/exporter/stackdriver v0.13.4
 	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v38.2.0+incompatible
+	github.com/tektoncd/pipeline v0.25.0 => ../../../../tektoncd/pipeline
 )
